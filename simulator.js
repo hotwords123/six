@@ -66,8 +66,8 @@ let simulator = (function() {
         var vertices = new Box2D.NVector();
         for (let i = 0; i < n; ++i) {
             var angle = startAngle - i * eachAngle;
-            var vx = r * Math.sin(angle);
-            var vy = r * Math.cos(angle);
+            var vx = -r * Math.sin(angle);
+            var vy = -r * Math.cos(angle);
             vertices.push(new b2Vec2(vx, vy));
         }
         fixDef.shape.SetAsVector(vertices, n);
