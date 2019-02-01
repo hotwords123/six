@@ -16,7 +16,7 @@ let game = (function() {
         cxBricks: 5
     };
 
-    var started = false, paused = false;
+    var state = 'none';
 
     function makeBricks(cx, cy) {
 
@@ -121,8 +121,9 @@ let game = (function() {
 
     function newGame() {
 
-        started = true;
-        paused = false;
+        state = 'playing';
+
+        renderer.setTitle(null);
 
         simulator.initWorld(options);
 
@@ -134,12 +135,39 @@ let game = (function() {
 
         simulator.start();
     }
+
+    function animateNewGame() {
+        UI.$container.css('opacity', 1)
+        .animate({ opacity: 0 }, 1000, () => {
+            newGame();
+            UI.$container.animate({ opacity: 1 }, 1000);
+        });
+    }
+
+    function gameWin() {
+        
+        if (state !== 'playing') return;
+        state = 'ended';
+
+        renderer.setTitle('Good Job!', 500);
+
+        setTimeout(animateNewGame, 4000);
+    }
+
+    function gameOver() {
+
+        if (state !== 'playing') return;
+        state = 'ended';
+
+        renderer.setTitle('Game Over', 500);
+
+        setTimeout(animateNewGame, 4000);
+    }
     
     return {
-        newGame,
+        newGame, gameWin, gameOver,
         get options() { return options; },
-        get started() { return started; },
-        get paused() { return paused; }
+        get state() { return state; }
     };
 
 })();

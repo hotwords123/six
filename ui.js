@@ -1,21 +1,35 @@
 
 let UI = (function() {
 
-    var $board;
+    var $container, $board;
 
-    function mouseDownHandler(e) {
-        if (!game.started || game.paused) return;
-        var pos = renderer.toWorldPos(e.offsetX, e.offsetY);
+    function boardClick(x, y) {
+        if (game.state !== 'playing') return;
+        var pos = renderer.toWorldPos(x, y);
         simulator.removeBrickAt(pos);
     }
 
-    function init(board) {
-        $board = $(board);
-        $board.mousedown(mouseDownHandler);
+    function init() {
+        $container = $('.game-container');
+        $board = $('#canvas');
+        if (util.isMobileDevice()) {
+            $board.on('touchstart', function(e) {
+                if (e.touches.length === 1) {
+                    var touch = e.touches[0];
+                    boardClick(touch.clientX, touch.clientY);
+                }
+                e.preventDefault();
+            });
+        } else {
+            $board.mousedown(function(e) {
+                boardClick(e.offsetX, e.offsetY);
+            });
+        }
     }
     
     return {
-        init
+        init,
+        get $container() { return $container; }
     };
 
 })();

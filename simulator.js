@@ -59,7 +59,7 @@ let simulator = (function() {
         var fixDef = new b2FixtureDef();
         fixDef.density     = 1.0;
         fixDef.friction    = 0.4;
-        fixDef.restitution = 0.2;
+        fixDef.restitution = 0.1;
 
         fixDef.shape = new b2PolygonShape();
 
@@ -94,7 +94,7 @@ let simulator = (function() {
         var fixDef = new b2FixtureDef();
         fixDef.density     = 1.0;
         fixDef.friction    = 0.4;
-        fixDef.restitution = 0.2;
+        fixDef.restitution = 0.1;
 
         fixDef.shape = new b2PolygonShape();
 
@@ -122,7 +122,7 @@ let simulator = (function() {
         
         var fixDef = new b2FixtureDef();
         fixDef.friction    = 0.4;
-        fixDef.restitution = 0.2;
+        fixDef.restitution = 0.1;
         
         fixDef.shape = new b2PolygonShape();
         fixDef.shape.SetAsBox(w / 2, h / 2);
@@ -213,9 +213,28 @@ let simulator = (function() {
     }
 
     function updateWorld() {
+
         world.Step(1 / tps, 10, 10);
-        var sixY = six.GetPosition().y;
-        renderer.setCameraY(sixY, false);
+
+        var sixPos = six.GetPosition();
+
+        var maxOffsetX = options.cxBricks * options.brick.size / 2 + options.six.radius;
+        if (Math.abs(sixPos.x) > maxOffsetX) {
+            game.gameOver();
+        }
+        
+        if (six.GetLinearVelocity().Length() < 0.001) {
+            var halfAngle = Math.PI / options.six.sides;
+            var sixBottom = sixPos.y + options.six.radius * Math.cos(halfAngle);
+            if (Math.abs(sixBottom - flatTop) < 0.1) {
+                game.gameWin();
+            }
+        }
+
+        if (['playing', 'paused'].includes(game.state)) {
+            renderer.setCameraY(sixPos.y, false);
+        }
+
         renderer.render();
     }
 

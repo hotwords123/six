@@ -8,14 +8,14 @@ $(document).ready(function() {
 
     renderer.setCanvas(canvas);
     renderer.loadOptions();
-    renderer.setHeight(window.innerHeight, false);
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
     renderer.initRenderFn();
 
-    $(window).resize(function() {
-        renderer.setHeight(window.innerHeight, true);
-    });
+    window.addEventListener('resize', function() {
+        renderer.setSize(window.innerWidth, window.innerHeight, true);
+    }, false);
 
-    UI.init($('#canvas'));
+    UI.init();
 
     game.newGame();
 

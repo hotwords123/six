@@ -8,14 +8,15 @@ let renderer = (function() {
     var canvas = null;
     var ctx = null;
 
-    const sxBricks = 9;
     const syBricks = 16;
-    const cameraAspect = sxBricks / syBricks;
 
     var cameraWidth, cameraHeight;
     var cameraScale, cameraY;
 
     var brickSize;
+
+    var title = null, titleOpacity = 1;
+    var titleTimeStart = null, titleDuration = null;
 
     var renderFn = {};
 
@@ -26,20 +27,33 @@ let renderer = (function() {
 
     function loadOptions() {
         brickSize = game.options.brick.size;
-        cameraWidth = sxBricks * brickSize;
         cameraHeight = syBricks * brickSize;
     }
 
-    function setHeight(height, redraw = true) {
+    function setSize(width, height, redraw = true) {
+        canvas.width = width;
         canvas.height = height;
-        canvas.width = cameraAspect * height;
         cameraScale = height / cameraHeight;
+        cameraWidth = width / cameraScale;
         if (redraw) render();
     }
 
     function setCameraY(y, redraw = false) {
         cameraY = y;
         if (redraw) render();
+    }
+
+    function setTitle(newTitle, duration = 0) {
+        title = newTitle;
+        if (duration > 0) {
+            titleOpacity = 0;
+            titleTimeStart = Date.now();
+            titleDuration = duration;
+        } else {
+            titleOpacity = 1;
+            titleTimeStart = null;
+            titleDuration = null;
+        }
     }
 
     function setRenderFn(type, fn) {
@@ -153,6 +167,24 @@ let renderer = (function() {
         });
     }
 
+    function drawTitle() {
+        if (titleDuration) {
+            titleOpacity = (Date.now() - titleTimeStart) / titleDuration;
+            if (titleOpacity >= 1) {
+                titleOpacity = 1;
+                titleTimeStart = null;
+                titleDuration = null;
+            }
+        }
+        ctx.globalAlpha = titleOpacity;
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 0.1em "Clear Sans"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(title, cameraWidth / 2, cameraHeight / 4);
+        ctx.globalAlpha = 1;
+    }
+
     function renderBodies() {
         var world = simulator.world;
         for (var body = world.GetBodyList(); body; body = body.GetNext()) {
@@ -164,30 +196,28 @@ let renderer = (function() {
     }
 
     function render() {
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         ctx.save();
-
         ctx.scale(cameraScale, cameraScale);
-        ctx.translate(cameraWidth / 2, cameraHeight / 3 - cameraY);
-
+        ctx.save();
+        ctx.translate(cameraWidth / 2, cameraHeight / 2 - cameraY);
         renderBodies();
-
+        ctx.restore();
+        if (title) drawTitle();
         ctx.restore();
     }
 
     function toWorldPos(x, y) {
         return {
             x: x / cameraScale - cameraWidth / 2,
-            y: y / cameraScale - cameraHeight / 3 + cameraY
+            y: y / cameraScale - cameraHeight / 2 + cameraY
         };
     }
     
     return {
-        setCanvas, loadOptions, setHeight,
+        setCanvas, loadOptions, setSize,
         initRenderFn,
-        setCameraY,
+        setCameraY, setTitle,
         render,
         toWorldPos
     };

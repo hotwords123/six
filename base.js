@@ -16,5 +16,13 @@ let util = {
             res.push(size.length === 1 ? val : util.makeArray(size1, val));
         }
         return res;
+    },
+    isMobileDevice() {
+        var str = navigator.userAgent.toLowerCase();
+        var arr = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPad", "iPod"]
+        for (let i = 0; i < arr.length; ++i) {
+            if (str.includes(arr[i].toLowerCase())) return true;
+        }
+        return false;
     }
 };
