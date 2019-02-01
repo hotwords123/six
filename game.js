@@ -110,7 +110,7 @@ let game = (function() {
                     data: {
                         color: {
                             background: `hsl(${h}, ${s}%, ${l}%)`,
-                            border: `hsl(${h}, ${s - 10}%, ${l - 10}%)`
+                            border: `hsl(${h}, ${s - 15}%, ${l - 10}%)`
                         }
                     }
                 });

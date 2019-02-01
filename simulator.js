@@ -58,8 +58,8 @@ let simulator = (function() {
 
         var fixDef = new b2FixtureDef();
         fixDef.density     = 1.0;
-        fixDef.friction    = 0.35;
-        fixDef.restitution = 0.15;
+        fixDef.friction    = 0.4;
+        fixDef.restitution = 0.2;
 
         fixDef.shape = new b2PolygonShape();
 
@@ -93,8 +93,8 @@ let simulator = (function() {
 
         var fixDef = new b2FixtureDef();
         fixDef.density     = 1.0;
-        fixDef.friction    = 0.35;
-        fixDef.restitution = 0.15;
+        fixDef.friction    = 0.4;
+        fixDef.restitution = 0.2;
 
         fixDef.shape = new b2PolygonShape();
 
@@ -121,8 +121,8 @@ let simulator = (function() {
         });
         
         var fixDef = new b2FixtureDef();
-        fixDef.friction    = 0.35;
-        fixDef.restitution = 0.15;
+        fixDef.friction    = 0.4;
+        fixDef.restitution = 0.2;
         
         fixDef.shape = new b2PolygonShape();
         fixDef.shape.SetAsBox(w / 2, h / 2);
