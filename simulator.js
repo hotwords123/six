@@ -19,9 +19,20 @@ let simulator = (function() {
     
     var world;
     var options;
+    var brickBuffer;
     var flatTop;
+    var minFallY, maxFallY;
     var six, flat;
     var timer = null;
+
+    var audioCtx = new AudioContext();
+    var perfInfo = {
+        time: {
+            total: 0,
+            simulate: 0,
+            render: 0
+        }
+    };
 
     /*
         {
@@ -151,6 +162,7 @@ let simulator = (function() {
         flatTop = null;
         six = null;
         flat = null;
+        brickBuffer = [];
     }
 
     function moveFlat(top) {
@@ -169,9 +181,10 @@ let simulator = (function() {
         flat = Flat(options.flat.width, options.flat.height);
 
         moveFlat(0);
+        renderer.setCameraY(0);
     }
 
-    function addBricks(bricks, cyBricks) {
+    function appendBricksToWorld(bricks, cyBricks) {
 
         var brickSize = options.brick.size;
         var halfSize = brickSize / 2;
@@ -185,6 +198,23 @@ let simulator = (function() {
             var top = topBound + y * brickSize;
             Brick(left, top, brickSize, sub, data);
         });
+    }
+    
+    function getMinFlatTop() {
+        return renderer.getCameraY() + 0.55 * renderer.getCameraSize().height;
+    }
+
+    function checkBrickBuffer() {
+        var minFlatTop = getMinFlatTop();
+        while (brickBuffer.length && flatTop < minFlatTop) {
+            var pile = brickBuffer.shift();
+            appendBricksToWorld(pile.bricks, pile.cyBricks);
+        }
+    }
+
+    function addBricks(bricks, cyBricks) {
+        brickBuffer.push({ bricks, cyBricks });
+        checkBrickBuffer();
     }
 
     function getBrickAt(pos) {
@@ -205,37 +235,67 @@ let simulator = (function() {
         return brick;
     }
 
-    function removeBrickAt(pos) {
+    function removeBrickAt(pos, callback) {
         var brick = getBrickAt(pos);
         if (brick) {
+            callback(brick);
             world.DestroyBody(brick);
         }
     }
 
     function updateWorld() {
 
+        var time0 = audioCtx.currentTime;
+
         world.Step(1 / tps, 10, 10);
 
         var sixPos = six.GetPosition();
 
         var maxOffsetX = options.cxBricks * options.brick.size / 2 + options.six.radius;
-        if (Math.abs(sixPos.x) > maxOffsetX) {
+        if (game.state !== 'ended' && Math.abs(sixPos.x) > maxOffsetX) {
+            minFallY = sixPos.y;
+            maxFallY = minFallY + renderer.getCameraSize().height / 2;
             game.gameOver();
         }
         
-        if (six.GetLinearVelocity().Length() < 0.001) {
-            var halfAngle = Math.PI / options.six.sides;
-            var sixBottom = sixPos.y + options.six.radius * Math.cos(halfAngle);
-            if (Math.abs(sixBottom - flatTop) < 0.1) {
-                game.gameWin();
+        checkBrickBuffer();
+
+        if (game.attr.endless) {
+            var minFlatTop = getMinFlatTop();
+            if (flatTop < minFlatTop) {
+                var cyMin = Math.ceil((minFlatTop - flatTop) / options.brick.size);
+                game.requireBricks(cyMin);
+            }
+        } else {
+            if (game.state !== 'ended' && six.GetLinearVelocity().Length() < 0.001) {
+                var halfAngle = Math.PI / options.six.sides;
+                var sixBottom = sixPos.y + options.six.radius * Math.cos(halfAngle);
+                if (Math.abs(sixBottom - flatTop) < 0.1) {
+                    game.gameWin();
+                }
             }
         }
 
         if (['playing', 'paused'].includes(game.state)) {
-            renderer.setCameraY(sixPos.y, false);
+            renderer.setCameraY(sixPos.y);
+        } else {
+            var k = Math.sin(Math.atan((sixPos.y - minFallY) / (maxFallY - minFallY)));
+            renderer.setCameraY(minFallY + k * (maxFallY - minFallY));
         }
 
+        var time1 = audioCtx.currentTime;
+
         renderer.render();
+
+        var time2 = audioCtx.currentTime;
+
+        perfInfo.time.simulate += time1 - time0;
+        perfInfo.time.render += time2 - time1;
+        perfInfo.time.total += time2 - time0;
+    }
+
+    function getPerformanceInfo() {
+        return perfInfo;
     }
 
     function start() {
@@ -252,6 +312,7 @@ let simulator = (function() {
         init,
         clearWorld, initWorld,
         addBricks, removeBrickAt,
+        getPerformanceInfo,
         start, stop,
         get world() { return world; }
     };

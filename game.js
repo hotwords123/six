@@ -1,7 +1,11 @@
 
 let game = (function() {
 
-    var options = {
+    const
+        b2Math = Box2D.Common.Math.b2Math,
+        b2Vec2 = Box2D.Common.Math.b2Vec2;
+
+    const defaultOptions = {
         six: {
             sides: 6,
             radius: 2.4
@@ -16,7 +20,42 @@ let game = (function() {
         cxBricks: 5
     };
 
+    const defaultAttr = {
+        endless: false,
+        cntBrickPiles: null
+    };
+
+    const gameModes = {
+        'level': {
+            attr: {
+                endless: false,
+                cntBrickPiles: 6
+            }
+        },
+        'endless': {
+            attr: {
+                endless: true
+            }
+        }
+    };
+
+    const storageKey = {
+        bestScore: 'six_bestScore'
+    };
+
     var state = 'none';
+    var score, bestScore = getBestScoreFromStorage();
+    var mode, modeParams, attr, options;
+
+    var lastClickTime, comboScore;
+
+    function getBestScoreFromStorage() {
+        var x = localStorage.getItem(storageKey.bestScore);
+        if (!x) return 0;
+        x = +x;
+        if (x < 0 || !Number.isInteger(x)) return 0;
+        return x;
+    }
 
     function makeBricks(cx, cy) {
 
@@ -110,7 +149,8 @@ let game = (function() {
                     data: {
                         color: {
                             background: `hsl(${h}, ${s}%, ${l}%)`,
-                            border: `hsl(${h}, ${s - 15}%, ${l - 10}%)`
+                            border: `hsl(${h}, ${s - 15}%, ${l - 10}%)`,
+                            score: `hsl(${h}, ${s - 15}%, ${l - 40}%)`
                         }
                     }
                 });
@@ -119,21 +159,110 @@ let game = (function() {
         return bricks;
     }
 
-    function newGame() {
+    function addNewBricks(cy) {
+        var bricks = makeBricks(options.cxBricks, cy);
+        simulator.addBricks(bricks, cy);
+    }
+
+    function newGame(gameMode = 'endless') {
+
+        if (!Array.isArray(gameMode)) {
+            gameMode = [gameMode];
+        }
 
         state = 'playing';
+        mode = gameMode.slice(0);
+        modeParams = mode.map((m) => gameModes[m] || {});
+        attr = Object.assign({}, defaultAttr,
+            ...modeParams.map((param) => param.attr || {}));
+        options = Object.assign({}, defaultOptions,
+            ...modeParams.map((param) => param.options || {}));
+        
+        score = 0;
+        lastClickTime = 0;
 
+        renderer.loadOptions(options);
         renderer.setTitle(null);
 
         simulator.initWorld(options);
 
-        for (let i = 0; i < 6; ++i) {
-            var cy = util.randInt(3, 6);
-            var bricks = makeBricks(options.cxBricks, cy);
-            simulator.addBricks(bricks, cy);
+        if (attr.endless) {
+            addNewBricks(12);
+        } else {
+            for (let i = 0; i < attr.cntBrickPiles; ++i) {
+                addNewBricks(12);
+            }
         }
 
         simulator.start();
+    }
+
+    function requireBricks(cyMin) {
+        var pileHeight = 12;
+        var cntPiles = Math.ceil(cyMin / pileHeight);
+        while (cntPiles--) {
+            addNewBricks(pileHeight);
+        }
+    }
+
+    function click(x, y) {
+        if (state !== 'playing') return;
+        var pos = renderer.toWorldPos(x, y);
+        simulator.removeBrickAt(pos, (brick) => {
+            var bodyData = brick.GetUserData();
+
+            var timePassed = Date.now() - lastClickTime;
+            var scoreAdd;
+            if (timePassed <= 750) {
+                if (timePassed <= 400) {
+                    comboScore += 1;
+                    scoreAdd = comboScore + 1;
+                } else {
+                    scoreAdd = comboScore;
+                }
+            } else {
+                comboScore = 5;
+                scoreAdd = comboScore;
+            }
+            if (scoreAdd > 20) scoreAdd = 20;
+            score += scoreAdd;
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem(storageKey.bestScore, bestScore);
+            }
+            renderer.scoreAdditionAt(scoreAdd, pos, bodyData.color.score);
+
+            var xf = brick.GetTransform();
+            var vBrick = brick.GetLinearVelocity();
+            var bgColor = bodyData.color.background;
+            var bSize = options.brick.size;
+            var hSize = bSize / 2;
+            var center = brick.GetWorldCenter();
+            for (let fix = brick.GetFixtureList(); fix; fix = fix.GetNext()) {
+                var fixData = fix.GetUserData();
+                var centerX = fixData.x * bSize;
+                var centerY = fixData.y * bSize;
+                var cnt = util.randInt(8, 16);
+                while (cnt--) {
+                    var localX = centerX + Math.random() * bSize - hSize;
+                    var localY = centerY + Math.random() * bSize - hSize;
+                    var { x, y } = b2Math.MulX(xf, new b2Vec2(localX, localY));
+                    var v = util.randInt(5, 10) / 10;
+                    renderer.addParticle({
+                        pos: { x, y },
+                        velocity: {
+                            x: vBrick.x + v * (x - center.x + bSize * util.randInt(-5, 5) / 10),
+                            y: vBrick.y + v * (y - center.y + bSize * util.randInt(-5, 5) / 10)
+                        },
+                        angle: Math.random() * (2 * Math.PI),
+                        size: util.randInt(25, 45) / 100 * hSize,
+                        color: bgColor
+                    });
+                }
+            }
+
+            lastClickTime = Date.now();
+        });
     }
 
     function animateNewGame() {
@@ -166,8 +295,13 @@ let game = (function() {
     
     return {
         newGame, gameWin, gameOver,
+        requireBricks, click,
+        get state() { return state; },
+        get mode() { return mode; },
+        get attr() { return attr; },
         get options() { return options; },
-        get state() { return state; }
+        get score() { return score; },
+        get bestScore() { return bestScore; }
     };
 
 })();

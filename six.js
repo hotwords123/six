@@ -7,16 +7,16 @@ $(document).ready(function() {
     simulator.init();
 
     renderer.setCanvas(canvas);
-    renderer.loadOptions();
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.initRenderFn();
 
     window.addEventListener('resize', function() {
-        renderer.setSize(window.innerWidth, window.innerHeight, true);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.render();
     }, false);
 
     UI.init();
 
-    game.newGame();
+    game.newGame('endless');
 
 });

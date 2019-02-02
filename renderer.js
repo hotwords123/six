@@ -8,15 +8,22 @@ let renderer = (function() {
     var canvas = null;
     var ctx = null;
 
-    const syBricks = 16;
+    const syBricks = util.isMobileDevice() ? 14 : 16;
 
+    var cameraInitialized = false;
     var cameraWidth, cameraHeight;
     var cameraScale, cameraY;
 
+    var fps = null, fpsStart = Date.now(), fpsFrames = 0;
+
+    var cachedOptions;
     var brickSize;
 
-    var title = null, titleOpacity = 1;
-    var titleTimeStart = null, titleDuration = null;
+    var titleText = null, titleOpacity = null;
+
+    var scoreAdditions = [];
+
+    var particles = [];
 
     var renderFn = {};
 
@@ -25,35 +32,70 @@ let renderer = (function() {
         ctx = canvas.getContext('2d');
     }
 
-    function loadOptions() {
-        brickSize = game.options.brick.size;
-        cameraHeight = syBricks * brickSize;
+    function resizeCamera() {
+        if (!cameraHeight) return;
+        cameraScale = canvas.height / cameraHeight;
+        cameraWidth = canvas.width / cameraScale;
+        cameraInitialized = true;
     }
 
-    function setSize(width, height, redraw = true) {
+    function loadOptions(options) {
+        cachedOptions = options;
+        brickSize = options.brick.size;
+        cameraHeight = syBricks * brickSize;
+        resizeCamera();
+    }
+
+    function setSize(width, height) {
         canvas.width = width;
         canvas.height = height;
-        cameraScale = height / cameraHeight;
-        cameraWidth = width / cameraScale;
-        if (redraw) render();
+        resizeCamera();
     }
 
-    function setCameraY(y, redraw = false) {
+    function setCameraY(y) {
         cameraY = y;
-        if (redraw) render();
+    }
+
+    function getCameraY() {
+        return cameraY;
+    }
+
+    function getCameraSize() {
+        return {
+            width: cameraWidth,
+            height: cameraHeight,
+            scale: cameraScale
+        };
     }
 
     function setTitle(newTitle, duration = 0) {
-        title = newTitle;
-        if (duration > 0) {
-            titleOpacity = 0;
-            titleTimeStart = Date.now();
-            titleDuration = duration;
+        titleText = newTitle;
+        if (titleText) {
+            titleOpacity = new Transition(0, 1, duration);
         } else {
-            titleOpacity = 1;
-            titleTimeStart = null;
-            titleDuration = null;
+            titleOpacity = null;
         }
+    }
+
+    function scoreAdditionAt(score, pos, color) {
+        var time = 0.6;
+        scoreAdditions.push({
+            score, pos, color,
+            opacity: new Transition(1, 0, 1000 * time),
+            offsetY: new Transition(0, -0.8 * brickSize, 1000 * time),
+            destroyed: false
+        });
+    }
+
+    function addParticle({ pos, velocity, angle, size, color }) {
+        var time = 0.3;
+        particles.push({
+            angle, color,
+            size: new Transition(size, 0, 1000 * time),
+            x: new Transition(pos.x, pos.x + time * velocity.x, 1000 * time),
+            y: new Transition(pos.y, pos.y + time * velocity.y, 1000 * time),
+            destroyed: false
+        });
     }
 
     function setRenderFn(type, fn) {
@@ -161,28 +203,142 @@ let renderer = (function() {
         });
         setRenderFn('flat', (body) => {
             var { x, y } = body.GetPosition();
-            var { width, height } = game.options.flat;
+            var { width, height } = cachedOptions.flat;
             ctx.fillStyle = '#666';
             ctx.fillRect(x - width / 2, y - height / 2, width, height);
         });
     }
 
     function drawTitle() {
-        if (titleDuration) {
-            titleOpacity = (Date.now() - titleTimeStart) / titleDuration;
-            if (titleOpacity >= 1) {
-                titleOpacity = 1;
-                titleTimeStart = null;
-                titleDuration = null;
-            }
-        }
-        ctx.globalAlpha = titleOpacity;
+        if (!titleText) return;
+        titleOpacity.update();
+        ctx.globalAlpha = titleOpacity.value;
         ctx.fillStyle = '#000';
         ctx.font = 'bold 0.1em "Clear Sans"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(title, cameraWidth / 2, cameraHeight / 4);
+        ctx.fillText(titleText, cameraWidth / 2, cameraHeight * 0.3);
         ctx.globalAlpha = 1;
+    }
+
+    function updateFPS() {
+        var timePassed = Date.now() - fpsStart;
+        ++fpsFrames;
+        if (timePassed >= 500)  {
+            fps = fpsFrames * (1000 / timePassed);
+            fpsStart = Date.now();
+            fpsFrames = 0;
+            return true;
+        }
+        return false;
+    }
+
+    function drawFPS() {
+        var fpsText = '--';
+        if (typeof fps === 'number') {
+            if (fps < 1) {
+                fpsText = '<1';
+            } else if (fps > 99) {
+                fpsText = '99+';
+            } else {
+                fpsText = Math.round(fps).toString();
+            }
+        }
+        while (fpsText.length < 3) fpsText = ' ' + fpsText;
+        fpsText = 'FPS:' + fpsText;
+        ctx.fillStyle = '#000';
+        ctx.font = '0.08em monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText(fpsText, cameraWidth * 0.98, cameraHeight * 0.01);
+    }
+
+    function drawScore() {
+        var str;
+        var textOffsetX = brickSize * cachedOptions.cxBricks / 3;
+
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        
+        ctx.textBaseline = 'bottom';
+        ctx.font = `bold 0.1em "Clear Sans"`;
+
+        str = game.score.toString();
+        ctx.fillText(str, cameraWidth / 2 - textOffsetX, cameraHeight * 0.16);
+
+        str = game.bestScore.toString();
+        ctx.fillText(str, cameraWidth / 2 + textOffsetX, cameraHeight * 0.16);
+
+        ctx.textBaseline = 'top';
+        ctx.font = '0.06em "Clear Sans"';
+
+        ctx.fillText('Score', cameraWidth / 2 - textOffsetX, cameraHeight * 0.16);
+        ctx.fillText('Best', cameraWidth / 2 + textOffsetX, cameraHeight * 0.16);
+    }
+
+    function drawScoreAdditions() {
+        ctx.font = 'bold 0.06em "Clear Sans"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        scoreAdditions.forEach((obj) => {
+            if (obj.opacity.update()) {
+                obj.destroyed = true;
+                return;
+            }
+            obj.offsetY.update();
+            ctx.globalAlpha = obj.opacity.value;
+            ctx.fillStyle = obj.color;
+            ctx.fillText('+' + obj.score, obj.pos.x, obj.pos.y + obj.offsetY.value);
+        });
+        scoreAdditions = scoreAdditions.filter((obj) => !obj.destroyed);
+        ctx.globalAlpha = 1;
+    }
+
+    function drawParticles() {
+        particles.forEach((particle) => {
+            if (particle.size.update()) {
+                particle.destroyed = true;
+                return;
+            }
+            particle.x.update();
+            particle.y.update();
+            var size = particle.size.value;
+            var cx = particle.x.value;
+            var cy = particle.y.value;
+            ctx.fillStyle = particle.color;
+            var points = [];
+            for (let i = 0; i < 4; ++i) {
+                var angle = particle.angle + i * (Math.PI / 2);
+                points.push({
+                    x: cx + size * Math.cos(angle),
+                    y: cy + size * Math.sin(angle)
+                });
+            }
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < 4; ++i) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath();
+            ctx.fill();
+        });
+        particles = particles.filter((particle) => !particle.destroyed);
+    }
+
+    function drawPerformanceInfo() {
+        var info = simulator.getPerformanceInfo();
+        ctx.fillStyle = 'rgba(192, 192, 192, 0.8)';
+        ctx.fillRect(0, 0, canvas.width * (info.time.render / info.time.total), 10);
+    }
+
+    function drawShadow() {
+        var shadowHeight = cameraHeight * 0.4;
+        var gradient = ctx.createLinearGradient(0, 0, 0, shadowHeight);
+        gradient.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+        gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.4)');
+        gradient.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, cameraWidth, shadowHeight);
     }
 
     function renderBodies() {
@@ -197,14 +353,22 @@ let renderer = (function() {
 
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!cameraInitialized) return;
         ctx.save();
         ctx.scale(cameraScale, cameraScale);
         ctx.save();
         ctx.translate(cameraWidth / 2, cameraHeight / 2 - cameraY);
         renderBodies();
+        drawParticles();
+        drawScoreAdditions();
         ctx.restore();
-        if (title) drawTitle();
+        drawShadow();
+        drawTitle();
+        updateFPS();
+        drawFPS();
+        drawScore();
         ctx.restore();
+        drawPerformanceInfo();
     }
 
     function toWorldPos(x, y) {
@@ -215,9 +379,9 @@ let renderer = (function() {
     }
     
     return {
-        setCanvas, loadOptions, setSize,
+        setCanvas, loadOptions, setSize, getCameraSize,
         initRenderFn,
-        setCameraY, setTitle,
+        setCameraY, getCameraY, setTitle, scoreAdditionAt, addParticle,
         render,
         toWorldPos
     };
