@@ -7,17 +7,15 @@ let simulator = (function() {
         b2BodyDef = Box2D.Dynamics.b2BodyDef,
         b2Body = Box2D.Dynamics.b2Body,
         b2FixtureDef = Box2D.Dynamics.b2FixtureDef,
-        b2Fixture = Box2D.Dynamics.b2Fixture,
         b2World = Box2D.Dynamics.b2World,
-        b2MassData = Box2D.Collision.Shapes.b2MassData,
-        b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape,
-        b2CircleShape = Box2D.Collision.Shapes.b2CircleShape,
-        b2DebugDraw = Box2D.Dynamics.b2DebugDraw,
-        b2MouseJointDef =  Box2D.Dynamics.Joints.b2MouseJointDef;
+        b2ContactListener = Box2D.Dynamics.b2ContactListener,
+        b2WorldManifold = Box2D.Collision.b2WorldManifold,
+        b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape;
     
     const tps = 60;
     
     var world;
+    var contactListener;
     var options;
     var brickBuffer;
     var flatTop;
@@ -147,6 +145,108 @@ let simulator = (function() {
 
         world = new b2World(new b2Vec2(0, 9.8), true);
 
+        contactListener = new b2ContactListener();
+        contactListener.BeginContact = onBeginContact;
+        contactListener.EndContact = onEndContact;
+        contactListener.PreSolve = onPreSolve;
+        contactListener.PostSolve = onPostSolve;
+
+        world.SetContactListener(contactListener);
+    }
+
+    function getColorOf(data) {
+        switch (data.type) {
+            case 'six':
+                return 'hsl(210, 80%, 70%)';
+            case 'brick':
+                return data.color.border;
+            case 'flat':
+                return '#666';
+            default:
+                return null;
+        }
+    }
+
+    function onBeginContact(contact) {
+        //
+    }
+
+    function onEndContact(contact) {
+        //
+    }
+
+    function onPreSolve(contact, oldManifold) {
+        //
+    }
+
+    function onPostSolve(contact, impulse) {
+        var fixA = contact.GetFixtureA();
+        var fixB = contact.GetFixtureB();
+        var bodyA = fixA.GetBody();
+        var bodyB = fixB.GetBody();
+        var dataA = bodyA.GetUserData();
+        var dataB = bodyB.GetUserData();
+
+        if (!dataA || !dataB) return;
+
+        var typeA = dataA.type;
+        var typeB = dataB.type;
+        if (!typeA || !typeB) return;
+
+        var sixData, otherData;
+        if (typeA === 'six') {
+            sixData = dataA;
+            otherData = dataB;
+        } else if (typeB === 'six') {
+            sixData = dataB;
+            otherData = dataA;
+        } else return;
+
+        var cntPoints = contact.GetManifold().m_pointCount;
+        var manifold = new b2WorldManifold();
+        contact.GetWorldManifold(manifold);
+
+        for (let i = 0; i < cntPoints; ++i) {
+            var point = manifold.m_points[i];
+
+            var normalI = impulse.normalImpulses[i];
+            var tangentI = Math.abs(impulse.tangentImpulses[i]);
+            var power = 0;
+            var color = null;
+
+            if (normalI > 30) {
+                power = Math.min(6, Math.pow(normalI, 0.6) / 5);
+                color = getColorOf(sixData);
+            } else if (tangentI > 5) {
+                power = Math.min(5, Math.pow(tangentI, 0.8) / 3);
+                color = getColorOf(otherData);
+            } else return;
+
+            var maxOffset = power / 25 * options.brick.size;
+            var maxSpeed = power / 10 * options.brick.size;
+            var cnt = util.randInt(1, power * 2);
+
+            while (cnt--) {
+                var posAngle = Math.random() * (2 * Math.PI);
+                var speedAngle = Math.random() * (2 * Math.PI);
+                var offset = Math.random() * maxOffset;
+                var speed = Math.random() * maxSpeed;
+
+                renderer.addParticle({
+                    pos: {
+                        x: point.x + offset * Math.cos(posAngle),
+                        y: point.y + offset * Math.sin(posAngle)
+                    },
+                    velocity: {
+                        x: speed * Math.cos(speedAngle),
+                        y: speed * Math.sin(speedAngle)
+                    },
+                    angle: Math.random() * (2 * Math.PI),
+                    size: util.randInt(3, 5) / 20 * options.brick.size,
+                    color: color
+                });
+            }
+        }
     }
 
     function clearWorld() {
