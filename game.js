@@ -135,6 +135,17 @@ let game = (function() {
                             vis[x1][y1] = true;
                         }
                     });
+                    node.corner = [];
+                    dir.forEach(([ d1, dx1, dy1 ], index) => {
+                        var [d2, dx2, dy2] = dir[(index + 1) % 4];
+                        if (node.border.includes(d1) || node.border.includes(d2)) return;
+                        var x1 = x0 + dx1 + dx2;
+                        var y1 = y0 + dy1 + dy2;
+                        var anc1 = find(x1, y1);
+                        if (anc1.x !== i || anc1.y !== j) {
+                            node.corner.push([d1, d2]);
+                        }
+                    });
                 }
                 var h = hue0 + util.randInt(60) - 30;
                 var s = util.randInt(85, 95);

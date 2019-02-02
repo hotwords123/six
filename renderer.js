@@ -183,6 +183,18 @@ let renderer = (function() {
                     ctx.closePath();
                     ctx.fill();
                 });
+
+                data.corner.forEach(([ d1, d2 ]) => {
+                    var [dx1, dy1] = borderDir[d1];
+                    var [dx2, dy2] = borderDir[d2];
+                    var x = centerX + (dx1 + dx2) * borderOffset;
+                    var y = centerY + (dy1 + dy2) * borderOffset;
+                    var s = borderWidth;
+                    ctx.beginPath();
+                    orientedRect(xf, x, y, s, s);
+                    ctx.closePath();
+                    ctx.fill();
+                });
             }
             /*
             sub.forEach((node) => {
