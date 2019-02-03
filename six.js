@@ -17,6 +17,4 @@ $(document).ready(function() {
 
     UI.init();
 
-    game.newGame('endless');
-
 });

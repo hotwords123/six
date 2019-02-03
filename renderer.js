@@ -19,6 +19,8 @@ let renderer = (function() {
     var cachedOptions;
     var brickSize;
 
+    var background = null;
+
     var titleText = null, titleOpacity = null;
 
     var scoreAdditions = [];
@@ -78,11 +80,11 @@ let renderer = (function() {
     }
 
     function scoreAdditionAt(score, pos, color) {
-        var time = 0.6;
+        var time0 = 0.3, time1 = 0.3;
         scoreAdditions.push({
             score, pos, color,
-            opacity: new Transition(1, 0, 1000 * time),
-            offsetY: new Transition(0, -0.8 * brickSize, 1000 * time),
+            opacity: new Transition(1, 0, 1000 * time1, 1000 * time0),
+            offsetY: new Transition(0, -0.8 * brickSize, 1000 * (time0 + time1)),
             destroyed: false
         });
     }
@@ -221,6 +223,10 @@ let renderer = (function() {
         });
     }
 
+    function colorTiming(color0, color1, lambda) {
+        return color0.map((val, index) => val + (color1[index] - val) * lambda);
+    }
+
     function drawTitle() {
         if (!titleText) return;
         titleOpacity.update();
@@ -343,14 +349,41 @@ let renderer = (function() {
         ctx.fillRect(0, 0, canvas.width * (info.time.render / info.time.total), 10);
     }
 
-    function drawShadow() {
-        var shadowHeight = cameraHeight * 0.4;
-        var gradient = ctx.createLinearGradient(0, 0, 0, shadowHeight);
-        gradient.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
-        gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.4)');
-        gradient.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    function updateBackground() {
+        var current = game.getBackground();
+        if (!background) {
+            background = Transition.staticValue(current);
+        } else {
+            if (current.join(',') !== background.to.join(',')) {
+                var prev = background.value;
+                background = new Transition(prev, current, 600, 0, colorTiming);
+            }
+        }
+        background.update();
+    }
+
+    function drawBackground() {
+        var [R, G, B] = background.value;
+        var gradient = ctx.createLinearGradient(0, 0, 0, cameraHeight);
+        gradient.addColorStop(0.0, `rgba(${R}, ${G}, ${B}, 0.5)`);
+        gradient.addColorStop(0.4, `rgba(${R}, ${G}, ${B}, 0.5)`);
+        gradient.addColorStop(1.0, `rgba(${R}, ${G}, ${B}, 0.2)`);
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, cameraWidth, shadowHeight);
+        ctx.fillRect(0, 0, cameraWidth, cameraHeight);
+    }
+
+    function drawShadow() {
+        var [R, G, B] = background.value;
+        R = Math.round(255 - (255 - R) / 3);
+        G = Math.round(255 - (255 - G) / 3);
+        B = Math.round(255 - (255 - B) / 3);
+        var gradient = ctx.createLinearGradient(0, 0, 0, cameraHeight);
+        gradient.addColorStop(0.0, `rgba(${R}, ${G}, ${B}, 0.8)`);
+        gradient.addColorStop(0.3, `rgba(${R}, ${G}, ${B}, 0.5)`);
+        gradient.addColorStop(0.4, `rgba(${R}, ${G}, ${B}, 0.0)`);
+        gradient.addColorStop(1.0, `rgba(${R}, ${G}, ${B}, 0.0)`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, cameraWidth, cameraHeight);
     }
 
     function renderBodies() {
@@ -368,6 +401,8 @@ let renderer = (function() {
         if (!cameraInitialized) return;
         ctx.save();
         ctx.scale(cameraScale, cameraScale);
+        updateBackground();
+        drawBackground();
         ctx.save();
         ctx.translate(cameraWidth / 2, cameraHeight / 2 - cameraY);
         renderBodies();

@@ -22,7 +22,11 @@ let game = (function() {
 
     const defaultAttr = {
         endless: false,
-        cntBrickPiles: null
+        cntBrickPiles: null,
+        autoScrolling: false,
+        rollingSpeed: null,
+        rollingAccelerate: null,
+        maxRollingSpeed: null
     };
 
     const gameModes = {
@@ -36,25 +40,59 @@ let game = (function() {
             attr: {
                 endless: true
             }
+        },
+        'rolling': {
+            attr: {
+                autoScrolling: true,
+                rollingSpeed: 1.2,
+                rollingAccelerate: 0.025,
+                maxRollingSpeed: 3.6
+            }
         }
     };
 
     const storageKey = {
-        bestScore: 'six_bestScore'
+        bestScores: 'six_bestScores'
     };
 
+    var bestScores = loadBestScores();
+
     var state = 'none';
-    var score, bestScore = getBestScoreFromStorage();
+    var endingType;
+    var score, bestScore;
     var mode, modeParams, attr, options;
 
     var lastClickTime, comboScore;
 
-    function getBestScoreFromStorage() {
-        var x = localStorage.getItem(storageKey.bestScore);
-        if (!x) return 0;
-        x = +x;
-        if (x < 0 || !Number.isInteger(x)) return 0;
-        return x;
+    function loadBestScores() {
+        try {
+            var result = JSON.parse(localStorage.getItem(storageKey.bestScores));
+            if (!result || typeof result !== 'object') throw 0;
+            return result;
+        } catch (err) {
+            return {};
+        }
+    }
+
+    function saveBestScores() {
+        localStorage.setItem(storageKey.bestScores, JSON.stringify(bestScores));
+    }
+
+    function getModeId(mode) {
+        if (!Array.isArray(mode)) mode = [mode];
+        return mode.slice(0).sort().join(',');
+    }
+
+    function getBestScore(mode) {
+        var id = getModeId(mode);
+        if (typeof bestScores[id] === 'number') return bestScores[id];
+        return 0;
+    }
+
+    function setBestScore(mode, newBest) {
+        var id = getModeId(mode);
+        bestScores[id] = newBest;
+        saveBestScores();
     }
 
     function makeBricks(cx, cy) {
@@ -161,7 +199,7 @@ let game = (function() {
                         color: {
                             background: `hsl(${h}, ${s}%, ${l}%)`,
                             border: `hsl(${h}, ${s - 15}%, ${l - 10}%)`,
-                            score: `hsl(${h}, ${s - 15}%, ${l - 40}%)`
+                            score: `hsl(${h}, ${s - 5}%, ${l - 30}%)`
                         }
                     }
                 });
@@ -175,13 +213,14 @@ let game = (function() {
         simulator.addBricks(bricks, cy);
     }
 
-    function newGame(gameMode = 'endless') {
+    function newGame(gameMode) {
 
         if (!Array.isArray(gameMode)) {
             gameMode = [gameMode];
         }
 
         state = 'playing';
+        endingType = null;
         mode = gameMode.slice(0);
         modeParams = mode.map((m) => gameModes[m] || {});
         attr = Object.assign({}, defaultAttr,
@@ -190,6 +229,7 @@ let game = (function() {
             ...modeParams.map((param) => param.options || {}));
         
         score = 0;
+        bestScore = getBestScore(mode);
         lastClickTime = 0;
 
         renderer.loadOptions(options);
@@ -206,6 +246,63 @@ let game = (function() {
         }
 
         simulator.start();
+        
+        UI.$container.stop(true)
+        .animate({ opacity: 1 }, 500);
+    }
+
+    function getMaxOffsetX() {
+        return options.cxBricks * options.brick.size / 2 + options.six.radius;
+    }
+
+    function getBackground() {
+        const colors = {
+            white: [255, 255, 255],
+            green: [158, 250, 158],
+            blue: [158, 204, 250],
+            red: [247, 110, 110],
+            yellow: [250, 250, 56]
+        };
+
+        if (state === 'none') return colors.white;
+        if (state === 'ended') {
+            if (endingType === 'win') {
+                return colors.green;
+            } else {
+                return colors.red;
+            }
+        }
+
+        var danger = 0, safety = 0;
+
+        var sixPos = simulator.sixPos;
+
+        if (attr.autoScrolling) {
+            var cameraY = renderer.getCameraY();
+            var cameraHeight = renderer.getCameraSize().height;
+            var top = cameraY - cameraHeight / 2;
+            var k = (sixPos.y - top) / cameraHeight;
+            if (k < 2/9) {
+                danger += 2;
+            } else if (k < 3/8) {
+                danger += 1;
+            } else if (k > 2/3) {
+                safety += 1;
+            }
+        }
+
+        var halfWidth = options.cxBricks * options.brick.size / 2;
+        var diffX = (halfWidth - Math.abs(sixPos.x)) / options.brick.size;
+        if (diffX < 0) {
+            danger += 2;
+        } else if (diffX < 0.8) {
+            danger += 1;
+        }
+
+        if (danger > 1) return colors.red;
+        if (danger > 0) return colors.yellow;
+        if (safety > 0) return colors.green;
+        return colors.blue;
     }
 
     function requireBricks(cyMin) {
@@ -214,6 +311,15 @@ let game = (function() {
         while (cntPiles--) {
             addNewBricks(pileHeight);
         }
+    }
+
+    function scoreAdditionAt(scoreAdd, pos, color) {
+        score += scoreAdd;
+        if (score > bestScore) {
+            bestScore = score;
+            setBestScore(mode, score);
+        }
+        renderer.scoreAdditionAt(scoreAdd, pos, color);
     }
 
     function click(x, y) {
@@ -236,12 +342,7 @@ let game = (function() {
                 scoreAdd = comboScore;
             }
             if (scoreAdd > 20) scoreAdd = 20;
-            score += scoreAdd;
-            if (score > bestScore) {
-                bestScore = score;
-                localStorage.setItem(storageKey.bestScore, bestScore);
-            }
-            renderer.scoreAdditionAt(scoreAdd, pos, bodyData.color.score);
+            scoreAdditionAt(scoreAdd, pos, bodyData.color.score);
 
             var xf = brick.GetTransform();
             var vBrick = brick.GetLinearVelocity();
@@ -276,38 +377,49 @@ let game = (function() {
         });
     }
 
-    function animateNewGame() {
-        UI.$container.css('opacity', 1)
-        .animate({ opacity: 0 }, 1000, () => {
-            newGame();
-            UI.$container.animate({ opacity: 1 }, 1000);
-        });
+    function gameStop() {
+        simulator.stop();
+        state = 'none';
+        endingType = null;
+        // do something
+    }
+
+    function scheduleStop(delay) {
+        UI.$container.stop(true)
+        .css('opacity', 1)
+        .delay(delay)
+        .animate({ opacity: 0 }, 1000, gameStop);
     }
 
     function gameWin() {
         
         if (state !== 'playing') return;
         state = 'ended';
+        endingType = 'win';
 
         renderer.setTitle('Good Job!', 500);
 
-        setTimeout(animateNewGame, 4000);
+        scheduleStop(3000);
     }
 
-    function gameOver() {
+    function gameOver(type) {
 
         if (state !== 'playing') return;
         state = 'ended';
+        endingType = 'lose';
 
         renderer.setTitle('Game Over', 500);
 
-        setTimeout(animateNewGame, 4000);
+        scheduleStop(4000);
     }
     
     return {
         newGame, gameWin, gameOver,
         requireBricks, click,
+        scoreAdditionAt,
+        getBackground, getMaxOffsetX,
         get state() { return state; },
+        get endingType() { return endingType; },
         get mode() { return mode; },
         get attr() { return attr; },
         get options() { return options; },

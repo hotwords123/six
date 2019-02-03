@@ -19,6 +19,8 @@ let simulator = (function() {
     var options;
     var brickBuffer;
     var flatTop;
+    var autoScrollY, autoScrollSpeed, autoScrollAccelerate;
+    var autoScrollScoringCooldown = 0;
     var minFallY, maxFallY;
     var six, flat;
     var timer = null;
@@ -219,7 +221,11 @@ let simulator = (function() {
                 color = getColorOf(sixData);
             } else if (tangentI > 5) {
                 power = Math.min(5, Math.pow(tangentI, 0.8) / 3);
-                color = getColorOf(otherData);
+                if (otherData.type === 'flat') {
+                    color = getColorOf(sixData);
+                } else {
+                    color = getColorOf(otherData);
+                }
             } else return;
 
             var maxOffset = power / 25 * options.brick.size;
@@ -271,17 +277,29 @@ let simulator = (function() {
         flatTop = top;
     }
 
-    function initWorld(sceneOptions) {
+    function initWorld(gameOptions) {
         
         clearWorld();
 
-        options = sceneOptions;
+        options = gameOptions;
 
         six = Six(0, 0, options.six.radius, options.six.sides);
         flat = Flat(options.flat.width, options.flat.height);
+        
+        if (game.attr.autoScrolling) {
+            autoScrollY = -renderer.getCameraSize().height / 6;
+            autoScrollSpeed = game.attr.rollingSpeed;
+            autoScrollAccelerate = game.attr.rollingAccelerate;
+            autoScrollScoringCooldown = 0;
+        } else {
+            autoScrollY = null;
+            autoScrollSpeed = null;
+            autoScrollAccelerate = null;
+            autoScrollScoringCooldown = null;
+        }
 
         moveFlat(0);
-        renderer.setCameraY(0);
+        adjustCamera();
     }
 
     function appendBricksToWorld(bricks, cyBricks) {
@@ -343,19 +361,111 @@ let simulator = (function() {
         }
     }
 
+    function checkGameOver() {
+        var sixPos = six.GetPosition();
+        var cameraHeight = renderer.getCameraSize().height;
+        var maxOffsetX = game.getMaxOffsetX();
+        if (Math.abs(sixPos.x) > maxOffsetX) return 'generic.fall';
+        if (game.attr.autoScrolling) {
+            var cameraTop = renderer.getCameraY() - cameraHeight / 2;
+            var halfAngle = Math.PI / options.six.sides;
+            var minSixY = cameraTop + options.six.radius * Math.cos(halfAngle);
+            if (sixPos.y < minSixY) return 'rolling.touch_top';
+        }
+        return null;
+    }
+
+    function checkWin() {
+        var sixPos = six.GetPosition();
+        if (game.attr.endless) return false;
+        if (six.GetLinearVelocity().Length() < 0.001) {
+            var halfAngle = Math.PI / options.six.sides;
+            var sixBottom = sixPos.y + options.six.radius * Math.cos(halfAngle);
+            if (Math.abs(sixBottom - flatTop) < 0.1) return true;
+        }
+        return false;
+    }
+
+    function doAutoScrolling(tickTime) {
+
+        autoScrollY += autoScrollSpeed * tickTime;
+
+        if (game.state === 'playing') {
+            var sixPos = six.GetPosition();
+            var scoringY = autoScrollY + renderer.getCameraSize().height / 6;
+            if (sixPos.y >= scoringY) {
+                if (autoScrollScoringCooldown <= 0.005) {
+                    game.scoreAdditionAt(1, {
+                        x: sixPos.x,
+                        y: sixPos.y - 1.2 * options.six.radius
+                    }, getColorOf(six.GetUserData()));
+                    autoScrollScoringCooldown = 0.5;
+                }
+                autoScrollScoringCooldown -= tickTime;
+            } else {
+                autoScrollScoringCooldown = 0;
+            }
+        }
+
+        autoScrollSpeed += autoScrollAccelerate * tickTime;
+        if (autoScrollSpeed > game.attr.maxRollingSpeed) {
+            autoScrollSpeed = game.attr.maxRollingSpeed;
+            autoScrollAccelerate = 0;
+        } else if (autoScrollSpeed < 0) {
+            autoScrollSpeed = 0;
+            autoScrollAccelerate = 0;
+        }
+    }
+
+    function calcCameraEnding(type) {
+        if (game.attr.autoScrolling) {
+            if (type === 'generic.fall') {
+                var sixVelocity = six.GetLinearVelocity().y;
+                autoScrollAccelerate = 9.8 + (sixVelocity - autoScrollSpeed) / 3;
+            } else {
+                autoScrollAccelerate = -autoScrollSpeed / 1;
+            }
+        }
+        minFallY = renderer.getCameraY();
+        maxFallY = minFallY + renderer.getCameraSize().height / 2;
+    }
+
+    function adjustCamera() {
+        var originY;
+        if (game.attr.autoScrolling) {
+            originY = autoScrollY;
+        } else {
+            originY = six.GetPosition().y;
+        }
+        if (game.state !== 'ended') {
+            renderer.setCameraY(originY);
+        } else {
+            var k = Math.sin(Math.atan((originY - minFallY) / (maxFallY - minFallY)));
+            renderer.setCameraY(minFallY + k * (maxFallY - minFallY));
+        }
+    }
+
     function updateWorld() {
+
+        var tickTime = 1 / tps;
 
         var time0 = audioCtx.currentTime;
 
-        world.Step(1 / tps, 10, 10);
+        world.Step(tickTime, 10, 10);
 
-        var sixPos = six.GetPosition();
+        if (game.attr.autoScrolling) {
+            doAutoScrolling(tickTime);
+        }
 
-        var maxOffsetX = options.cxBricks * options.brick.size / 2 + options.six.radius;
-        if (game.state !== 'ended' && Math.abs(sixPos.x) > maxOffsetX) {
-            minFallY = sixPos.y;
-            maxFallY = minFallY + renderer.getCameraSize().height / 2;
-            game.gameOver();
+        if (game.state !== 'ended') {
+            var overType = checkGameOver();
+            if (overType) {
+                game.gameOver(overType);
+                calcCameraEnding(overType);
+            } else if (checkWin()) {
+                game.gameWin();
+                calcCameraEnding('win');
+            }
         }
         
         checkBrickBuffer();
@@ -366,22 +476,9 @@ let simulator = (function() {
                 var cyMin = Math.ceil((minFlatTop - flatTop) / options.brick.size);
                 game.requireBricks(cyMin);
             }
-        } else {
-            if (game.state !== 'ended' && six.GetLinearVelocity().Length() < 0.001) {
-                var halfAngle = Math.PI / options.six.sides;
-                var sixBottom = sixPos.y + options.six.radius * Math.cos(halfAngle);
-                if (Math.abs(sixBottom - flatTop) < 0.1) {
-                    game.gameWin();
-                }
-            }
         }
 
-        if (['playing', 'paused'].includes(game.state)) {
-            renderer.setCameraY(sixPos.y);
-        } else {
-            var k = Math.sin(Math.atan((sixPos.y - minFallY) / (maxFallY - minFallY)));
-            renderer.setCameraY(minFallY + k * (maxFallY - minFallY));
-        }
+        adjustCamera();
 
         var time1 = audioCtx.currentTime;
 
@@ -406,6 +503,7 @@ let simulator = (function() {
     function stop() {
         if (timer === null) return;
         clearInterval(timer);
+        timer = null;
     }
 
     return {
@@ -414,7 +512,8 @@ let simulator = (function() {
         addBricks, removeBrickAt,
         getPerformanceInfo,
         start, stop,
-        get world() { return world; }
+        get world() { return world; },
+        get sixPos() { return six.GetPosition(); }
     };
 
 })();

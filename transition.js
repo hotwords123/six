@@ -5,24 +5,23 @@ class Transition {
         this.endTime = this.startTime + duration;
         this.from = from;
         this.to = to;
-        this.current = from;
+        this.ended = false;
+        this.value = from;
         this.timing = Transition.getTimingFunction(timing);
-    }
-    get value() {
-        return this.current;
     }
     update() {
         var now = Date.now();
         if (now <= this.startTime) {
-            this.current = this.from;
+            this.value = this.from;
             return false;
         }
         if (now >= this.endTime) {
-            this.current = this.to;
+            this.value = this.to;
+            this.ended = true;
             return true;
         }
         var lambda = (now - this.startTime) / (this.endTime - this.startTime);
-        this.current = this.from + this.timing(lambda) * (this.to - this.from);
+        this.value = this.timing(this.from, this.to, lambda);
         return false;
     }
     static defineTimingFunction(timing, fn) {
@@ -37,8 +36,11 @@ class Transition {
         }
         return this.timingFunctions[this.defaultTiming];
     }
+    static staticValue(value) {
+        return new Transition(value, value, -1, 1, () => value);
+    }
 }
 
 Transition.timingFunctions = {};
-Transition.defineTimingFunction('linear', (lambda) => lambda);
+Transition.defineTimingFunction('linear', (x, y, lambda) => x + lambda * (y - x));
 Transition.defaultTiming = 'linear';
