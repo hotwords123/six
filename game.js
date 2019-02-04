@@ -319,7 +319,7 @@ let game = (function() {
         var diffX = (halfWidth - Math.abs(sixPos.x)) / options.brick.size;
         if (diffX < 0) {
             danger += 2;
-        } else if (diffX < 0.8) {
+        } else if (diffX < 0.6) {
             danger += 1;
         }
 
