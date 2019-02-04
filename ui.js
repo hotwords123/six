@@ -1,11 +1,40 @@
 
 let UI = (function() {
 
-    var $container, $board;
+    var pages, currentPage;
 
-    function init() {
-        $container = $('.game-container');
-        $board = $('#canvas');
+    function definePage(name, dom) {
+        pages[name] = {
+            $page: $(dom)
+        };
+    }
+
+    function initPages() {
+        pages = {};
+        definePage('home', '.ui-container');
+        definePage('mode', '.ui-mode');
+        definePage('game', '.game-container');
+        currentPage = 'home';
+    }
+
+    function initListeners() {
+        var $board = $('#canvas');
+
+        $('#btn-play').click(function() {
+            switchTo('mode');
+        });
+
+        $('.six-btn-mode[data-mode]').click(function() {
+            var mode = $(this).attr('data-mode').split(',');
+            switchTo('game', () => {
+                game.newGame(mode);
+            }, 400, 1000);
+        });
+
+        $('#btn-m-back').click(function() {
+            switchTo('home');
+        });
+
         if (util.isMobileDevice()) {
             $board.on('touchstart', function(e) {
                 if (e.touches.length === 1) {
@@ -19,11 +48,51 @@ let UI = (function() {
                 game.click(e.offsetX, e.offsetY);
             });
         }
+
+        $('#btn-g-play').click(function(e) {
+            if (game.state === 'paused') {
+                game.resume();
+            }
+        });
+
+        $('#btn-g-pause').click(function(e) {
+            if (game.state === 'playing') {
+                game.pause();
+            }
+        });
+
+        $('#btn-g-home').click(function(e) {
+            switchTo('home', () => {
+                game.stop();
+            }, 1000, 400);
+        });
+    }
+
+    function init() {
+        initPages();
+        initListeners();
+    }
+
+    function switchTo(page, callback = null, timeOut = 400, timeIn = 400) {
+        pages[currentPage].$page
+        .stop(true)
+        .addClass('six-page-disabled')
+        .fadeOut(timeOut, () => {
+            if (callback) callback();
+            pages[currentPage].$page.removeClass('six-page-disabled');
+            pages[page].$page.fadeIn(timeIn);
+            currentPage = page;
+        });
+    }
+
+    function onStateChange(oldState, newState) {
+        var $game = pages.game.$page;
+        if (oldState) $game.removeClass(oldState);
+        $game.addClass(newState);
     }
     
     return {
-        init,
-        get $container() { return $container; }
+        init, switchTo, onStateChange
     };
 
 })();

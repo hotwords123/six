@@ -62,6 +62,8 @@ let game = (function() {
     var score, bestScore;
     var mode, modeParams, attr, options;
 
+    var scheduledTimer = null;
+
     var lastClickTime, comboScore;
 
     function loadBestScores() {
@@ -93,6 +95,29 @@ let game = (function() {
         var id = getModeId(mode);
         bestScores[id] = newBest;
         saveBestScores();
+    }
+
+    function clearSchedule() {
+        if (scheduledTimer) {
+            clearTimeout(scheduledTimer);
+            scheduledTimer = null;
+        }
+    }
+
+    function scheduleNewGame(delay) {
+        clearSchedule();
+        var oldMode = mode;
+        scheduledTimer = setTimeout(() => {
+            UI.switchTo('game', () => {
+                stop();
+                newGame(oldMode);
+            }, 1000, 1000);
+        }, delay);
+    }
+
+    function setState(newState) {
+        UI.onStateChange(state, newState);
+        state = newState;
     }
 
     function makeBricks(cx, cy) {
@@ -219,7 +244,9 @@ let game = (function() {
             gameMode = [gameMode];
         }
 
-        state = 'playing';
+        clearSchedule();
+
+        setState('playing');
         endingType = null;
         mode = gameMode.slice(0);
         modeParams = mode.map((m) => gameModes[m] || {});
@@ -246,9 +273,6 @@ let game = (function() {
         }
 
         simulator.start();
-        
-        UI.$container.stop(true)
-        .animate({ opacity: 1 }, 500);
     }
 
     function getMaxOffsetX() {
@@ -377,44 +401,47 @@ let game = (function() {
         });
     }
 
-    function gameStop() {
-        simulator.stop();
-        state = 'none';
+    function stop() {
+        if (state === 'none') return;
+        setState('none');
         endingType = null;
-        // do something
+        simulator.stop();
     }
 
-    function scheduleStop(delay) {
-        UI.$container.stop(true)
-        .css('opacity', 1)
-        .delay(delay)
-        .animate({ opacity: 0 }, 1000, gameStop);
-    }
-
-    function gameWin() {
-        
+    function pause() {
         if (state !== 'playing') return;
-        state = 'ended';
+        setState('paused');
+        simulator.stop();
+    }
+
+    function resume() {
+        if (state !== 'paused') return;
+        setState('playing');
+        simulator.start();
+    }
+
+    function gameWin() {      
+        if (state !== 'playing') return;
+        setState('ended');
         endingType = 'win';
 
         renderer.setTitle('Good Job!', 500);
 
-        scheduleStop(3000);
+        scheduleNewGame(3000);
     }
 
     function gameOver(type) {
-
         if (state !== 'playing') return;
-        state = 'ended';
+        setState('ended');
         endingType = 'lose';
 
         renderer.setTitle('Game Over', 500);
 
-        scheduleStop(4000);
+        scheduleNewGame(4000);
     }
     
     return {
-        newGame, gameWin, gameOver,
+        newGame, gameWin, gameOver, stop, pause, resume,
         requireBricks, click,
         scoreAdditionAt,
         getBackground, getMaxOffsetX,

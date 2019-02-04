@@ -13,6 +13,8 @@ let renderer = (function() {
     var cameraInitialized = false;
     var cameraWidth, cameraHeight;
     var cameraScale, cameraY;
+    
+    var debugMode = 'off';
 
     var fps = null, fpsStart = Date.now(), fpsFrames = 0;
 
@@ -68,6 +70,17 @@ let renderer = (function() {
             height: cameraHeight,
             scale: cameraScale
         };
+    }
+
+    function setDebugMode(flag) {
+        if (typeof flag === 'boolean') {
+            flag = flag ? 'on' : 'off';
+        }
+        debugMode = flag;
+    }
+
+    function isDebugMode() {
+        return debugMode === 'on';
     }
 
     function setTitle(newTitle, duration = 0) {
@@ -232,7 +245,7 @@ let renderer = (function() {
         titleOpacity.update();
         ctx.globalAlpha = titleOpacity.value;
         ctx.fillStyle = '#000';
-        ctx.font = 'bold 0.1em "Clear Sans"';
+        ctx.font = 'bold 0.1rem "Clear Sans"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(titleText, cameraWidth / 2, cameraHeight * 0.3);
@@ -252,6 +265,7 @@ let renderer = (function() {
     }
 
     function drawFPS() {
+        if (!isDebugMode()) return;
         var fpsText = '--';
         if (typeof fps === 'number') {
             if (fps < 1) {
@@ -262,10 +276,8 @@ let renderer = (function() {
                 fpsText = Math.round(fps).toString();
             }
         }
-        while (fpsText.length < 3) fpsText = ' ' + fpsText;
-        fpsText = 'FPS:' + fpsText;
         ctx.fillStyle = '#000';
-        ctx.font = '0.08em monospace';
+        ctx.font = '0.08rem monospace';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
         ctx.fillText(fpsText, cameraWidth * 0.98, cameraHeight * 0.01);
@@ -279,7 +291,7 @@ let renderer = (function() {
         ctx.textAlign = 'center';
         
         ctx.textBaseline = 'bottom';
-        ctx.font = `bold 0.1em "Clear Sans"`;
+        ctx.font = `bold 0.1rem "Clear Sans"`;
 
         str = game.score.toString();
         ctx.fillText(str, cameraWidth / 2 - textOffsetX, cameraHeight * 0.16);
@@ -288,14 +300,14 @@ let renderer = (function() {
         ctx.fillText(str, cameraWidth / 2 + textOffsetX, cameraHeight * 0.16);
 
         ctx.textBaseline = 'top';
-        ctx.font = '0.06em "Clear Sans"';
+        ctx.font = '0.06rem "Clear Sans"';
 
         ctx.fillText('Score', cameraWidth / 2 - textOffsetX, cameraHeight * 0.16);
         ctx.fillText('Best', cameraWidth / 2 + textOffsetX, cameraHeight * 0.16);
     }
 
     function drawScoreAdditions() {
-        ctx.font = 'bold 0.06em "Clear Sans"';
+        ctx.font = 'bold 0.06rem "Clear Sans"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         scoreAdditions.forEach((obj) => {
@@ -344,6 +356,7 @@ let renderer = (function() {
     }
 
     function drawPerformanceInfo() {
+        if (!isDebugMode()) return;
         var info = simulator.getPerformanceInfo();
         ctx.fillStyle = 'rgba(192, 192, 192, 0.8)';
         ctx.fillRect(0, 0, canvas.width * (info.time.render / info.time.total), 10);
@@ -428,6 +441,7 @@ let renderer = (function() {
     return {
         setCanvas, loadOptions, setSize, getCameraSize,
         initRenderFn,
+        setDebugMode, isDebugMode,
         setCameraY, getCameraY, setTitle, scoreAdditionAt, addParticle,
         render,
         toWorldPos
