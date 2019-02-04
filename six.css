@@ -148,7 +148,7 @@ body {
 }
 
 #game-btns i {
-    margin-right: .4em;
+    margin-right: .5em;
     color: rgba(64, 64, 64, 0.55);
     cursor: pointer;
     transition: color linear .25s 0s;
