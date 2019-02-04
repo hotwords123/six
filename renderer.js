@@ -377,6 +377,9 @@ let renderer = (function() {
 
     function drawBackground() {
         var [R, G, B] = background.value;
+        R = Math.round(R);
+        G = Math.round(G);
+        B = Math.round(B);
         var gradient = ctx.createLinearGradient(0, 0, 0, cameraHeight);
         gradient.addColorStop(0.0, `rgba(${R}, ${G}, ${B}, 0.5)`);
         gradient.addColorStop(0.4, `rgba(${R}, ${G}, ${B}, 0.5)`);
