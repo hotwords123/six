@@ -229,14 +229,14 @@ let simulator = (function() {
             } else return;
 
             var maxOffset = power / 25 * options.brick.size;
-            var maxSpeed = power / 10 * options.brick.size;
+            var maxSpeed = power / 4 * options.brick.size;
             var cnt = util.randInt(1, power * 2);
 
             while (cnt--) {
                 var posAngle = Math.random() * (2 * Math.PI);
                 var speedAngle = Math.random() * (2 * Math.PI);
                 var offset = Math.random() * maxOffset;
-                var speed = Math.random() * maxSpeed;
+                var speed = (Math.random() + 1) / 2 * maxSpeed;
 
                 renderer.addParticle({
                     pos: {

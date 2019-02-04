@@ -378,7 +378,7 @@ let game = (function() {
                 var fixData = fix.GetUserData();
                 var centerX = fixData.x * bSize;
                 var centerY = fixData.y * bSize;
-                var cnt = util.randInt(8, 16);
+                var cnt = util.randInt(10, 20);
                 while (cnt--) {
                     var localX = centerX + Math.random() * bSize - hSize;
                     var localY = centerY + Math.random() * bSize - hSize;
@@ -442,6 +442,7 @@ let game = (function() {
     
     return {
         newGame, gameWin, gameOver, stop, pause, resume,
+        clearSchedule,
         requireBricks, click,
         scoreAdditionAt,
         getBackground, getMaxOffsetX,

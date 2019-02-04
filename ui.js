@@ -2,6 +2,7 @@
 let UI = (function() {
 
     var pages, currentPage;
+    var $board;
 
     function definePage(name, dom) {
         pages[name] = {
@@ -18,7 +19,7 @@ let UI = (function() {
     }
 
     function initListeners() {
-        var $board = $('#canvas');
+        $board = $('#canvas');
 
         $('#btn-play').click(function() {
             switchTo('mode');
@@ -74,6 +75,7 @@ let UI = (function() {
     }
 
     function switchTo(page, callback = null, timeOut = 400, timeIn = 400) {
+        game.clearSchedule();
         pages[currentPage].$page
         .stop(true)
         .addClass('six-page-disabled')
