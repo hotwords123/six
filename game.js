@@ -442,7 +442,7 @@ let game = (function() {
     
     return {
         newGame, gameWin, gameOver, stop, pause, resume,
-        clearSchedule,
+        scheduleNewGame, clearSchedule,
         requireBricks, click,
         scoreAdditionAt,
         getBackground, getMaxOffsetX,

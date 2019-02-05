@@ -62,6 +62,10 @@ let UI = (function() {
             }
         });
 
+        $('#btn-g-retry').click(function(e) {
+            game.scheduleNewGame(0);
+        });
+
         $('#btn-g-home').click(function(e) {
             switchTo('home', () => {
                 game.stop();

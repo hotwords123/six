@@ -160,6 +160,7 @@ body {
 
 .game-container:not(.playing) #btn-g-pause,
 .game-container:not(.paused) #btn-g-play,
+.game-container:not(.paused) #btn-g-retry,
 .game-container:not(.paused):not(.ended) #btn-g-home {
     display: none;
 }
