@@ -276,8 +276,9 @@ let renderer = (function() {
                 fpsText = Math.round(fps).toString();
             }
         }
+        fpsText = 'FPS: ' + fpsText;
         ctx.fillStyle = '#000';
-        ctx.font = '0.08rem monospace';
+        ctx.font = '0.08rem sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
         ctx.fillText(fpsText, cameraWidth * 0.98, cameraHeight * 0.01);
@@ -358,6 +359,7 @@ let renderer = (function() {
     function drawPerformanceInfo() {
         if (!isDebugMode()) return;
         var info = simulator.getPerformanceInfo();
+        if (!info.time.render || !info.time.total) return;
         ctx.fillStyle = 'rgba(192, 192, 192, 0.8)';
         ctx.fillRect(0, 0, canvas.width * (info.time.render / info.time.total), 10);
     }

@@ -347,26 +347,28 @@ let game = (function() {
     }
 
     function click(x, y) {
-        if (state !== 'playing') return;
         var pos = renderer.toWorldPos(x, y);
         simulator.removeBrickAt(pos, (brick) => {
             var bodyData = brick.GetUserData();
 
             var timePassed = Date.now() - lastClickTime;
-            var scoreAdd;
-            if (timePassed <= 750) {
-                if (timePassed <= 400) {
-                    comboScore += 1;
-                    scoreAdd = comboScore + 1;
+
+            if (state === 'playing') {
+                var scoreAdd;
+                if (timePassed <= 750) {
+                    if (timePassed <= 400) {
+                        comboScore += 1;
+                        scoreAdd = comboScore + 1;
+                    } else {
+                        scoreAdd = comboScore;
+                    }
                 } else {
+                    comboScore = 5;
                     scoreAdd = comboScore;
                 }
-            } else {
-                comboScore = 5;
-                scoreAdd = comboScore;
+                if (scoreAdd > 20) scoreAdd = 20;
+                scoreAdditionAt(scoreAdd, pos, bodyData.color.score);
             }
-            if (scoreAdd > 20) scoreAdd = 20;
-            scoreAdditionAt(scoreAdd, pos, bodyData.color.score);
 
             var xf = brick.GetTransform();
             var vBrick = brick.GetLinearVelocity();
