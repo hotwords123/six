@@ -496,7 +496,7 @@ let simulator = (function() {
 
     function tick() {
         updateWorld();
-        requestAnimationFrame(tick);
+        timer = requestAnimationFrame(tick);
     }
 
     function start() {
@@ -507,6 +507,7 @@ let simulator = (function() {
     function stop() {
         if (timer === null) return;
         cancelAnimationFrame(timer);
+        timer = null;
     }
 
     return {
