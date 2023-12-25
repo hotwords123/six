@@ -11,9 +11,10 @@ let renderer = (function() {
     const syBricks = util.isMobileDevice() ? 14 : 16;
 
     var cameraInitialized = false;
-    var cameraWidth, cameraHeight;
+    var sceneWidth, sceneHeight;
     var cameraScale, cameraY;
-    
+    var pixelRatio = 1;
+
     var debugMode = 'off';
 
     var fps = null, fpsStart = Date.now(), fpsFrames = 0;
@@ -37,22 +38,25 @@ let renderer = (function() {
     }
 
     function resizeCamera() {
-        if (!cameraHeight) return;
-        cameraScale = canvas.height / cameraHeight;
-        cameraWidth = canvas.width / cameraScale;
+        if (!sceneHeight) return;
+        cameraScale = canvas.height / sceneHeight;
+        sceneWidth = canvas.width / cameraScale;
         cameraInitialized = true;
     }
 
     function loadOptions(options) {
         cachedOptions = options;
         brickSize = options.brick.size;
-        cameraHeight = syBricks * brickSize;
+        sceneHeight = syBricks * brickSize;
         resizeCamera();
     }
 
     function setSize(width, height) {
-        canvas.width = width;
-        canvas.height = height;
+        pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = width * pixelRatio;
+        canvas.height = height * pixelRatio;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
         resizeCamera();
     }
 
@@ -66,8 +70,8 @@ let renderer = (function() {
 
     function getCameraSize() {
         return {
-            width: cameraWidth,
-            height: cameraHeight,
+            width: sceneWidth,
+            height: sceneHeight,
             scale: cameraScale
         };
     }
@@ -172,7 +176,7 @@ let renderer = (function() {
                 var data = fix.GetUserData();
                 var centerX = data.x * brickSize;
                 var centerY = data.y * brickSize;
-                
+
                 ctx.beginPath();
                 orientedRect(xf, centerX, centerY, brickSize * 1.02, brickSize * 1.02);
                 ctx.closePath();
@@ -248,7 +252,7 @@ let renderer = (function() {
         ctx.font = 'bold 0.1rem "Clear Sans"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(titleText, cameraWidth / 2, cameraHeight * 0.3);
+        ctx.fillText(titleText, sceneWidth / 2, sceneHeight * 0.3);
         ctx.globalAlpha = 1;
     }
 
@@ -281,7 +285,7 @@ let renderer = (function() {
         ctx.font = '0.08rem sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
-        ctx.fillText(fpsText, cameraWidth * 0.98, cameraHeight * 0.01);
+        ctx.fillText(fpsText, sceneWidth * 0.98, sceneHeight * 0.01);
     }
 
     function drawScore() {
@@ -290,21 +294,21 @@ let renderer = (function() {
 
         ctx.fillStyle = '#000';
         ctx.textAlign = 'center';
-        
+
         ctx.textBaseline = 'bottom';
         ctx.font = `bold 0.1rem "Clear Sans"`;
 
         str = game.score.toString();
-        ctx.fillText(str, cameraWidth / 2 - textOffsetX, cameraHeight * 0.16);
+        ctx.fillText(str, sceneWidth / 2 - textOffsetX, sceneHeight * 0.16);
 
         str = game.bestScore.toString();
-        ctx.fillText(str, cameraWidth / 2 + textOffsetX, cameraHeight * 0.16);
+        ctx.fillText(str, sceneWidth / 2 + textOffsetX, sceneHeight * 0.16);
 
         ctx.textBaseline = 'top';
         ctx.font = '0.06rem "Clear Sans"';
 
-        ctx.fillText('Score', cameraWidth / 2 - textOffsetX, cameraHeight * 0.16);
-        ctx.fillText('Best', cameraWidth / 2 + textOffsetX, cameraHeight * 0.16);
+        ctx.fillText('Score', sceneWidth / 2 - textOffsetX, sceneHeight * 0.16);
+        ctx.fillText('Best', sceneWidth / 2 + textOffsetX, sceneHeight * 0.16);
     }
 
     function drawScoreAdditions() {
@@ -382,12 +386,12 @@ let renderer = (function() {
         R = Math.round(R);
         G = Math.round(G);
         B = Math.round(B);
-        var gradient = ctx.createLinearGradient(0, 0, 0, cameraHeight);
+        var gradient = ctx.createLinearGradient(0, 0, 0, sceneHeight);
         gradient.addColorStop(0.0, `rgba(${R}, ${G}, ${B}, 0.5)`);
         gradient.addColorStop(0.4, `rgba(${R}, ${G}, ${B}, 0.5)`);
         gradient.addColorStop(1.0, `rgba(${R}, ${G}, ${B}, 0.2)`);
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, cameraWidth, cameraHeight);
+        ctx.fillRect(0, 0, sceneWidth, sceneHeight);
     }
 
     function drawShadow() {
@@ -395,13 +399,13 @@ let renderer = (function() {
         R = Math.round(255 - (255 - R) / 3);
         G = Math.round(255 - (255 - G) / 3);
         B = Math.round(255 - (255 - B) / 3);
-        var gradient = ctx.createLinearGradient(0, 0, 0, cameraHeight);
+        var gradient = ctx.createLinearGradient(0, 0, 0, sceneHeight);
         gradient.addColorStop(0.0, `rgba(${R}, ${G}, ${B}, 0.8)`);
         gradient.addColorStop(0.3, `rgba(${R}, ${G}, ${B}, 0.5)`);
         gradient.addColorStop(0.4, `rgba(${R}, ${G}, ${B}, 0.0)`);
         gradient.addColorStop(1.0, `rgba(${R}, ${G}, ${B}, 0.0)`);
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, cameraWidth, cameraHeight);
+        ctx.fillRect(0, 0, sceneWidth, sceneHeight);
     }
 
     function renderBodies() {
@@ -422,7 +426,7 @@ let renderer = (function() {
         updateBackground();
         drawBackground();
         ctx.save();
-        ctx.translate(cameraWidth / 2, cameraHeight / 2 - cameraY);
+        ctx.translate(sceneWidth / 2, sceneHeight / 2 - cameraY);
         renderBodies();
         drawParticles();
         drawScoreAdditions();
@@ -438,11 +442,11 @@ let renderer = (function() {
 
     function toWorldPos(x, y) {
         return {
-            x: x / cameraScale - cameraWidth / 2,
-            y: y / cameraScale - cameraHeight / 2 + cameraY
+            x: x * pixelRatio / cameraScale - sceneWidth / 2,
+            y: y * pixelRatio / cameraScale - sceneHeight / 2 + cameraY
         };
     }
-    
+
     return {
         setCanvas, loadOptions, setSize, getCameraSize,
         initRenderFn,
