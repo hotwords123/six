@@ -1,6 +1,6 @@
 
 let simulator = (function() {
-    
+
     const
         b2Vec2 = Box2D.Common.Math.b2Vec2,
         b2AABB = Box2D.Collision.b2AABB,
@@ -11,9 +11,9 @@ let simulator = (function() {
         b2ContactListener = Box2D.Dynamics.b2ContactListener,
         b2WorldManifold = Box2D.Collision.b2WorldManifold,
         b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape;
-    
-    const tps = 60;
-    
+
+    const maxTickTime = 0.05;
+
     var world;
     var contactListener;
     var options;
@@ -24,8 +24,8 @@ let simulator = (function() {
     var minFallY, maxFallY;
     var six, flat;
     var timer = null;
+    var lastTickTime = performance.now();
 
-    var audioCtx = new AudioContext();
     var perfInfo = {
         time: {
             total: 0,
@@ -130,11 +130,11 @@ let simulator = (function() {
         flat.SetUserData({
             type: 'flat'
         });
-        
+
         var fixDef = new b2FixtureDef();
         fixDef.friction    = 0.4;
         fixDef.restitution = 0.1;
-        
+
         fixDef.shape = new b2PolygonShape();
         fixDef.shape.SetAsBox(w / 2, h / 2);
 
@@ -278,14 +278,14 @@ let simulator = (function() {
     }
 
     function initWorld(gameOptions) {
-        
+
         clearWorld();
 
         options = gameOptions;
 
         six = Six(0, 0, options.six.radius, options.six.sides);
         flat = Flat(options.flat.width, options.flat.height);
-        
+
         if (game.attr.autoScrolling) {
             autoScrollY = -renderer.getCameraSize().height / 6;
             autoScrollSpeed = game.attr.rollingSpeed;
@@ -308,7 +308,7 @@ let simulator = (function() {
         var halfSize = brickSize / 2;
         var leftBound = -options.cxBricks * halfSize;
         var topBound = flatTop;
-        
+
         moveFlat(topBound + cyBricks * brickSize);
 
         bricks.forEach(({ x, y, sub, data }) => {
@@ -317,7 +317,7 @@ let simulator = (function() {
             Brick(left, top, brickSize, sub, data);
         });
     }
-    
+
     function getMinFlatTop() {
         return renderer.getCameraY() + 0.55 * renderer.getCameraSize().height;
     }
@@ -446,10 +446,9 @@ let simulator = (function() {
     }
 
     function updateWorld() {
-
-        var tickTime = 1 / tps;
-
-        var time0 = audioCtx.currentTime;
+        var time0 = performance.now();
+        var tickTime = Math.min(maxTickTime, (time0 - lastTickTime) / 1000);
+        lastTickTime = time0;
 
         world.Step(tickTime, 10, 10);
 
@@ -467,7 +466,7 @@ let simulator = (function() {
                 calcCameraEnding('win');
             }
         }
-        
+
         checkBrickBuffer();
 
         if (game.attr.endless) {
@@ -480,11 +479,11 @@ let simulator = (function() {
 
         adjustCamera();
 
-        var time1 = audioCtx.currentTime;
+        var time1 = performance.now();
 
         renderer.render();
 
-        var time2 = audioCtx.currentTime;
+        var time2 = performance.now();
 
         perfInfo.time.simulate += time1 - time0;
         perfInfo.time.render += time2 - time1;
@@ -495,15 +494,19 @@ let simulator = (function() {
         return perfInfo;
     }
 
+    function tick() {
+        updateWorld();
+        requestAnimationFrame(tick);
+    }
+
     function start() {
         if (timer !== null) return;
-        timer = setInterval(updateWorld, 1000 / tps);
+        timer = requestAnimationFrame(tick);
     }
 
     function stop() {
         if (timer === null) return;
-        clearInterval(timer);
-        timer = null;
+        cancelAnimationFrame(timer);
     }
 
     return {
